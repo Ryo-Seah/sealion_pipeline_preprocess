@@ -2,10 +2,11 @@ datasets
 matplotlib 
 seaborn 
 scikit-learn 
-numpy 
+numpy-1.26.4
 datasketch 
 langdetect 
 transformers 
 scipy
 tqdm
 simhash
+fasttext
