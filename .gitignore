@@ -3,3 +3,5 @@ venv
 *.pyc
 !subset_1pct.jsonl
 /output
+/models
+/tokenizer_cache

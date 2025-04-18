@@ -9,6 +9,9 @@ import torch
 from torch.utils.data import Dataset as TorchDataset
 
 from config import *
+import fasttext
+lang_model = fasttext.load_model("models/lid.176.bin") 
+
 
 
 
@@ -17,14 +20,10 @@ from config import *
 #     ds = load_dataset("json", data_files="subset_1pct.jsonl", split="train")
 #     return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
 
+
 def safe_detect_lang(text):
-    try:
-        if isinstance(text, str) and len(text.split()) > 3:
-            return detect(text)
-        else:
-            return "undetermined"
-    except LangDetectException:
-        return "error"
+    prediction = lang_model.predict(text.replace("\n", " "))[0][0]
+    return prediction.replace("__label__", "")
 
 def clean_text(text):
     #feplace newline character n surrounding white space with space
@@ -42,6 +41,20 @@ def clean_text(text):
     #normalize white space
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
+
+def cached_tokenize(text, tokenizer, cache_dir="tokenizer_cache"):
+    os.makedirs(cache_dir, exist_ok=True)
+    text_hash = hashlib.md5(text.encode()).hexdigest()
+    cache_path = os.path.join(cache_dir, f"{text_hash}.json")
+    
+    if os.path.exists(cache_path):
+        with open(cache_path, "r") as f:
+            return json.load(f)["input_ids"]
+
+    token_ids = tokenizer(text).input_ids
+    with open(cache_path, "w") as f:
+        json.dump({"input_ids": token_ids}, f)
+    return token_ids
 
 #Filter min words, nonenglish(garbled), ocr quality threshold
 def filter_and_clean(example):
@@ -111,19 +124,21 @@ def tokenize_and_chunk(tokenizer, text, max_tokens=MAX_TOKENS):
     if buffer:
         chunks.append(buffer)
     return chunks
-
+#explore packing in groups instead of chunks
 def pack_sequences(tokenizer, chunks, max_tokens=MAX_TOKENS):
     packed = []
     buffer = []
     length = 0
     for chunk in chunks:
         tokens = tokenizer(chunk).input_ids
+        
         #if more than max token + 1 f for seprator exceed max token, we do not append to buffer and flush it 
         if length + len(tokens) + 1 > max_tokens:
             if buffer:
                 # when flushing, join chunks in buffer using seperator (EOT)
                 combined = SEPARATOR_TOKEN.join(buffer)
-                token_ids = tokenizer(combined).input_ids
+                # token_ids = tokenizer(combined).input_ids
+                token_ids = cached_tokenize(combined, tokenizer)
                 token_ids.append(tokenizer.eos_token_id)  # append EOS token explicitly
                 packed.append(token_ids)
                 
@@ -132,7 +147,8 @@ def pack_sequences(tokenizer, chunks, max_tokens=MAX_TOKENS):
         length += len(tokens)
     if buffer:
         combined = SEPARATOR_TOKEN.join(buffer)
-        token_ids = tokenizer(combined).input_ids
+        # token_ids = tokenizer(combined).input_ids
+        token_ids = cached_tokenize(combined, tokenizer)
         token_ids.append(tokenizer.eos_token_id)  # append EOS token
         packed.append(token_ids)
     return packed
@@ -196,7 +212,7 @@ def main():
         tokenized = process_batch(batch, tokenizer)
         all_outputs.extend(tokenized)
 
-    # Save cleaned texts and tokenized outputs
+    # save cleaned texts and tokenized outputs
     with open("output/processed_baseline.jsonl", "w") as f:
         for item in all_outputs:
             f.write(json.dumps(item) + "\n")

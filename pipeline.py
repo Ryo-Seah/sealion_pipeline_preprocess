@@ -14,6 +14,7 @@ from config import *
 
 def load_shard(shard_idx):
     ds = load_dataset("biglam/hmd_newspapers", split="train")
+    # ds = ds.shuffle(seed=42).select(range(30000))
 
     return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
 
