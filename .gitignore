@@ -1,3 +1,4 @@
 venv
 .jsonl
 .pyc
+!subset_1pct.jsonl
