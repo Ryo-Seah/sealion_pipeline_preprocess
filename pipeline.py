@@ -12,10 +12,10 @@ from config import *
 
 
 
-# def load_shard(shard_idx):
-#     # dataset = load_dataset("biglam/hmd_newspapers", split="train")
-#     ds = load_dataset("json", data_files="subset_1pct.jsonl", split="train")
-#     return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
+def load_shard(shard_idx):
+    dataset = load_dataset("biglam/hmd_newspapers", split="train")
+
+    return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
 
 def safe_detect_lang(text):
     try:
