@@ -1,5 +1,5 @@
 venv
-.jsonl
-.pyc
+*.jsonl
+*.pyc
 !subset_1pct.jsonl
-
+/output
