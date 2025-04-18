@@ -4,7 +4,7 @@ This repository contains a scalable and efficient pipeline for preprocessing his
 
 ---
 
-## 📦 Installation
+## Installation
 
 1. **Create and activate a virtual environment (recommended)**
 
@@ -21,13 +21,13 @@ This repository contains a scalable and efficient pipeline for preprocessing his
 
 ## ⚙️ Preprocessing Options
 
-### ✅ Run Locally
+### Run Locally
 
 ```bash
 python pipeline.py
 ```
 
-### 🖥️ Run using SLURM
+###  Run using SLURM
 
 1. Make the SLURM script executable:
 
@@ -45,7 +45,7 @@ Make sure `pipeline.py` uses the environment variable `SLURM_ARRAY_TASK_ID` to d
 
 ---
 
-## 📂 Output Files
+## Output Files
 
 All outputs will be written to the `output/` directory:
 
@@ -55,7 +55,7 @@ All outputs will be written to the `output/` directory:
 
 ---
 
-## 🧠 Preprocessing Logic
+## Preprocessing Logic
 
 Each article goes through the following steps:
 
