@@ -6,7 +6,7 @@
 #SBATCH --gpus=h100-96:1                    # Request 1 GPU
 #SBATCH --cpus-per-task=4               # Number of CPU cores
 #SBATCH --mem=64G                       # Memory
-#SBATCH --time=1:00:00                 # Max wall time (hh:mm:ss)
+#SBATCH --time=6:25:00                 # Max wall time (hh:mm:ss)
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryo_seah@u.nus.edu
 
