@@ -13,7 +13,7 @@ from config import *
 
 
 def load_shard(shard_idx):
-    dataset = load_dataset("biglam/hmd_newspapers", split="train")
+    ds = load_dataset("biglam/hmd_newspapers", split="train")
 
     return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
 
@@ -165,7 +165,8 @@ def batch_to_rows(batch):
         return [dict(row) for row in zip(*batch.to_dict().values())]
     
 def main():
-    ds = load_dataset("json", data_files="data/subset_1pct.jsonl", split="train")
+    shard_idx = int(os.getenv("SLURM_ARRAY_TASK_ID", 0))
+    ds = load_shard(shard_idx)
     # sampled = ds.shuffle(seed=42).select(range(500))
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     print("EOS token:", tokenizer.eos_token) #make sure is the same as my config
