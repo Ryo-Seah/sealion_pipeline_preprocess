@@ -1,0 +1,11 @@
+datasets 
+matplotlib 
+seaborn 
+scikit-learn 
+numpy 
+datasketch 
+langdetect 
+transformers 
+scipy
+tqdm
+simhash
