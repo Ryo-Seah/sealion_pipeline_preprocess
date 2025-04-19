@@ -7,7 +7,7 @@ from simhash import Simhash
 from tqdm import tqdm
 import torch
 from torch.utils.data import Dataset as TorchDataset
-
+import pandas as pd
 from config import *
 import fasttext
 lang_model = fasttext.load_model("models/lid.176.bin") 
@@ -15,10 +15,11 @@ lang_model = fasttext.load_model("models/lid.176.bin")
 
 
 
-# def load_shard(shard_idx):
-#     # dataset = load_dataset("biglam/hmd_newspapers", split="train")
-#     ds = load_dataset("json", data_files="subset_1pct.jsonl", split="train")
-#     return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
+def load_shard(shard_idx):
+    ds = load_dataset("biglam/hmd_newspapers", split="train")
+    ds = ds.shuffle(seed=42).select(range(30000))
+
+    return ds.shard(num_shards=SHARDS, index=shard_idx, contiguous=True)
 
 
 def safe_detect_lang(text):
@@ -76,19 +77,31 @@ def filter_and_clean(example):
         'word_count': example.get('word_count')
     }
 
-def deduplicate(examples):
-    if isinstance(examples, list):
-        examples = Dataset.from_list(examples)
+# def deduplicate(examples):
+#     if isinstance(examples, list):
+#         examples = Dataset.from_list(examples)
 
-    df = examples.to_pandas()
+#     df = examples.to_pandas()
 
-    # Clean and normalize text for deduplication
-    df['text_clean'] = df['text'].str.lower().str.replace(r'[^a-z0-9\s]', '', regex=True).str.strip()
-    df['text_hash'] = df['text_clean'].apply(hash)
+#     # Clean and normalize text for deduplication
+#     df['text_clean'] = df['text'].str.lower().str.replace(r'[^a-z0-9\s]', '', regex=True).str.strip()
+#     df['text_hash'] = df['text_clean'].apply(hash)
 
-    df_dedup = df.drop_duplicates(subset='text_hash').drop(columns=['text_clean', 'text_hash'])
+#     df_dedup = df.drop_duplicates(subset='text_hash').drop(columns=['text_clean', 'text_hash'])
 
-    return Dataset.from_pandas(df_dedup.reset_index(drop=True))
+#     return Dataset.from_pandas(df_dedup.reset_index(drop=True))
+def deduplicate(infile_path, outfile_path):
+    seen_hashes = set()
+    with open(outfile_path, 'w') as out:
+        for chunk in pd.read_json(infile_path, lines=True, chunksize=5000):
+            chunk['text_clean'] = chunk['text'].str.lower().str.replace(r'[^a-z0-9\s]', '', regex=True).str.strip()
+            chunk['text_hash'] = chunk['text_clean'].apply(hash)
+            chunk = chunk.drop_duplicates(subset='text_hash')
+            chunk.drop(columns=['text_clean', 'text_hash'], inplace=True)
+            for row in chunk.to_dict(orient='records'):
+                if row['id'] not in seen_hashes:
+                    seen_hashes.add(row['id'])
+                    out.write(json.dumps(row) + '\n')
 
 # def deduplicate(dataset):
 #     seen_hashes = set()
@@ -181,45 +194,45 @@ def batch_to_rows(batch):
         return [dict(row) for row in zip(*batch.to_dict().values())]
     
 def main():
-    dataset = load_dataset("biglam/hmd_newspapers", split="train")
-    ds = dataset.shuffle(seed=42).select(range(30000))
+    shard_idx = int(os.getenv("SLURM_ARRAY_TASK_ID", 0))
+    ds = load_shard(shard_idx)
+    # dataset = load_dataset("biglam/hmd_newspapers", split="train")
+    # ds = dataset.shuffle(seed=42).select(range(30000))
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    os.makedirs("output", exist_ok=True)
+    filtered_path = f"output/filtered_shard_{shard_idx}.jsonl"
+    deduped_path = f"output/deduped_shard_{shard_idx}.jsonl"
+
     print("EOS token:", tokenizer.eos_token) #make sure is the same as my config
-    all_filtered = []
-    cleaned_texts = []
+
 
     os.makedirs("output", exist_ok=True)
 
     # Filter in batches
-    for i in tqdm(range(0, len(ds), BATCH_SIZE)):
-        batch = ds.select(range(i, min(i + BATCH_SIZE, len(ds))))
-        for example in batch:
-            cleaned = filter_and_clean(example)
-            if cleaned is not None:
-                all_filtered.append(cleaned)
-                cleaned_texts.append({
-                    'id': cleaned['id'],
-                    'text': cleaned['text']
-                })
+    with open(filtered_path, 'w') as fout:
+        for i in tqdm(range(0, len(ds), BATCH_SIZE)):
+            batch = ds.select(range(i, min(i + BATCH_SIZE, len(ds))))
+            for example in batch:
+                cleaned = filter_and_clean(example)
+                if cleaned is not None:
+                    fout.write(json.dumps(cleaned) + "\n")
 
     # dedup across all
-    deduped = deduplicate(all_filtered)
+    deduped = deduplicate(filtered_path, deduped_path)
 
     # Tokenize deduplicated data in batches
     all_outputs = []
-    for i in range(0, len(deduped), BATCH_SIZE):
-        batch = deduped.select(range(i, min(i + BATCH_SIZE, len(deduped))))
-        tokenized = process_batch(batch, tokenizer)
-        all_outputs.extend(tokenized)
-
-    # save cleaned texts and tokenized outputs
-    with open("output/processed_baseline.jsonl", "w") as f:
+    with open(deduped_path, 'r') as f:
+        for chunk in pd.read_json(f, lines=True, chunksize=BATCH_SIZE):
+            dataset = Dataset.from_pandas(chunk)
+            batch = [row for row in dataset]
+            tokenized = process_batch(batch, tokenizer)
+            all_outputs.extend(tokenized)
+    
+    with open(f"output/processed_shard_{shard_idx}.jsonl", 'w') as f:
         for item in all_outputs:
-            f.write(json.dumps(item) + "\n")
+            f.write(json.dumps(item) + '\n')
 
-    with open("output/processed_texts.jsonl", "w") as f:
-        for item in all_filtered:
-            f.write(json.dumps(item) + "\n")
 
     save_as_pt("output/processed_baseline.jsonl", all_outputs)
 
