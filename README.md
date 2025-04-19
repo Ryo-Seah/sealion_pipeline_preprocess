@@ -99,3 +99,23 @@ SEPARATOR_TOKEN = "<|end_of_text|>"
 ```
 
 ---
+
+Processing of the full dataset takes a really long time:
+To look into how to make it run more efficiently. 
+
+1. langdetect is very slow, especially per sample, and runs in pure Python.
+
+fastText would be faster
+
+2. Tokenization (per chunk)
+python
+Copy
+Edit
+tokens = tokenizer(chunk).input_ids
+Tokenizer is called many times per article, once per paragraph/chunk.
+
+It re-encodes the same strings multiple times (tokenizer(temp) and later again tokenizer(combined)).
+
+3. Samller batch size : maybe 1024
+
+4. Parallelization

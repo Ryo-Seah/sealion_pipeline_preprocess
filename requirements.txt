@@ -10,3 +10,4 @@ scipy
 tqdm
 simhash
 fasttext
+pandas

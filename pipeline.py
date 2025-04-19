@@ -10,6 +10,7 @@ from torch.utils.data import Dataset as TorchDataset
 import pandas as pd
 from config import *
 import fasttext
+import pandas as pd
 lang_model = fasttext.load_model("models/lid.176.bin") 
 
 
