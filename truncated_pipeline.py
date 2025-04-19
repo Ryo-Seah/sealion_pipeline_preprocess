@@ -223,7 +223,7 @@ def main():
     # Tokenize deduplicated data in batches
     all_outputs = []
     with open(deduped_path, 'r') as f:
-        for chunk in pd.read_json(f, lines=True, chunksize=BATCH_SIZE):
+        for chunk in tqdm(pd.read_json(f, lines=True, chunksize=BATCH_SIZE), desc="Tokenizing"):
             dataset = Dataset.from_pandas(chunk)
             batch = [row for row in dataset]
             tokenized = process_batch(batch, tokenizer)
